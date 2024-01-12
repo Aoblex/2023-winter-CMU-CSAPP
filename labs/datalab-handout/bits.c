@@ -144,7 +144,9 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  /* symmetric differnce, use the De Morgan's laws*/
+/*
+ * Regard this as symmetric differnce, use the De Morgan's laws.
+ */
   return (~((~x)&(~y))) & (~(x&y));
 }
 /* 
@@ -154,6 +156,9 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
+/*
+ * Tmin = 100...00
+ */
   return (1 << 31);
 }
 //2
@@ -165,8 +170,23 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  /* 1+x+x is right, but x+x+1 is wrong */
-  return (!(~(1+x+x)))&(!(!(~x)));
+/* 
+ * If x is Tmax, then x is like '011...11'.
+ *
+ * Solution 1:
+ *   x = 011...11, then (~x) = 100...00
+ *   Check whether (~x) is equal to (1 << 31) to determine the result.
+ *   
+ * Solution 2:
+ *   x = 011...11, then (2*x + 1) = '111...111'
+ *   But for '111...111', (2*x + 1) also produces '111...111'.
+ *   Exclude this case by checking that (~x) is 0.
+ * 
+ *   Remark: '1+x+x' is right, but 'x+x+1' is wrong, why? Is there some kind of coercion?
+ */
+
+  return !((~x)^(1<<31)); // Solution 1
+  //return (!(~(1+x+x)))&(!(!(~x))); // Solution 2
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -177,9 +197,14 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  /* use mask 1010....1010 to check */
+/*
+ * Create a odd bits mask = '1010...1010'
+ * Use this mask to set all even-numbered bits in x to 0.
+ * If all odd-numbered bits in x are 1, then (x | (x >> 1)) is all ones.
+ * Determine the result by checking that (x | (x>>1)) = 111...111
+ */
   int odd_bits_mask, x_masked;
-  odd_bits_mask = 0xAA;
+  odd_bits_mask = 0xAA; // Initially, odd_bits_mask = 1010(binary).
   odd_bits_mask = odd_bits_mask | (odd_bits_mask << 4);
   odd_bits_mask = odd_bits_mask | (odd_bits_mask << 8);
   odd_bits_mask = odd_bits_mask | (odd_bits_mask << 16);
@@ -208,9 +233,25 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  int zero_to_seven_mask = 0x6;
+/*
+ *  decimal    binary    character
+ *    48       110000        0
+ *    49       110001        1
+ *    50       110010        2
+ *    51       110011        3
+ *    52       110100        4
+ *    53       110101        5
+ *    54       110110        6
+ *    55       110111        7
+ *    56       111000        8
+ *    57       111001        9
+ *
+ * For '0' to '7', verify that x is in the form of '000...000110###', where '#' can be '0' or '1'.
+ * For '8' and '9', verify that x is in the form of '000...00011100#', where '#' can be '0' or '1'.
+ */
+  int zero_to_seven_mask = 0x6; // zero_to_seven_mask = 110(binary)
   int zero_to_seven_offset = 3;
-  int eight_to_nine_mask = 0x1C;
+  int eight_to_nine_mask = 0x1C; // eight_to_nine_mask = 11100(binary)
   int eight_to_nine_offset = 1;
   int x_in_zero_to_seven = !((x>>zero_to_seven_offset)^zero_to_seven_mask);
   int x_in_eight_to_nine = !((x>>eight_to_nine_offset)^eight_to_nine_mask);
@@ -224,6 +265,14 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
+/*
+ * x_mask is all ones if x is true, otherwise all zeros.
+ * That is to say:
+ *   if x is zero, then x_mask = 000...000
+ *   if x is non-zero, then x_mask = 111...111
+ * 
+ * Use x_mask to mask y, and use (~x_mask) to mask z.
+ */
   /* if x is true, return y, else return z*/
   int x_mask = ((!(!x))<<31)>>31;
   return (x_mask&y)|((~x_mask)&z);
@@ -260,7 +309,15 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+/*
+ * We can or every single bit of x into its least significant bit in a binary manner.
+ */
+  x = x | (x >> 16);
+  x = x | (x >> 8);
+  x = x | (x >> 4);
+  x = x | (x >> 2);
+  x = x | (x >> 1);
+  return ((~x) & 1);
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -275,6 +332,21 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
+/*:
+ * k-bits representation range:
+ *   - k = 1: [-1, 0]
+ *   - k = 2: [-2, 1]
+ *   - k = 3: [-4, 3]
+ *   - k = 4: [-8, 7]
+ *   - k = 5: [-16, 15]
+ *     ...
+ *   - k = 9: [-256, 255]
+ *   - k = 10: [-512, 511]
+ *     ...
+ *   - k = i: [-2^(i-1), 2^(i-1) - 1]
+ * For any given x, want to find the minimum k in whose range x falls.
+ * Again, we can binarily.
+ */
   return 0;
 }
 //float
