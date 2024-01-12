@@ -236,36 +236,19 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  int diff = x^y;
-  int first_one_position = 0;
-  int current_shift;
-  int sign_comp, diff_comp;
-  sign_comp = (diff>>31) & 1;
-
-  current_shift = 16 & ((!(!(diff>>16))) << 4);
-  first_one_position = first_one_position + current_shift;
-  diff = diff >> current_shift;
-
-  current_shift = 8 & ((!(!(diff>>8))) << 3);
-  first_one_position = first_one_position + current_shift;
-  diff = diff >> current_shift;
-
-  current_shift = 4 & ((!(!(diff>>4))) << 2);
-  first_one_position = first_one_position + current_shift;
-  diff = diff >> current_shift;
-
-  current_shift = 2 & ((!(!(diff>>2))) << 1);
-  first_one_position = first_one_position + current_shift;
-  diff = diff >> current_shift;
-
-  current_shift = !(!(diff>>1));
-  first_one_position = first_one_position + current_shift;
-  diff = diff >> current_shift;
-
-  diff = diff & 1; // The first different position. diff is 0 if x=y.
-  y = (y >> first_one_position) & 1;
-  diff_comp = (!diff)|(diff&y);
-  return (sign_comp & (!diff_comp)) | ((!sign_comp) & diff_comp);
+/*
+ * !!!  x <= y  <==>  0 <= y - x  !!!
+ * Make sure that y - x is in range [-2147483648, +2147483647]
+ * First check the sign bit, then check the remaining bits.
+ * Suppose x and y are in [0, 2147483647], then y - x is in [-2147483647, 2147483647]
+ * Then check the sign bit of (y - x) to determine if y is greater than x.
+ */
+  int sign_x = (x >> 31) & 1;
+  int sign_y = (y >> 31) & 1;
+  int x_neg_y_pos = sign_x & (!sign_y);
+  int x_pos_y_neg = (!sign_x) & sign_y;
+  int y_sub_x_neg = ((y + (~x) + 1)>>31) & 1;
+  return (!x_pos_y_neg) & (x_neg_y_pos | (!y_sub_x_neg));
 }
 //4
 /* 
