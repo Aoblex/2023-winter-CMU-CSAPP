@@ -225,7 +225,7 @@ int isAsciiDigit(int x) {
  */
 int conditional(int x, int y, int z) {
   /* if x is true, return y, else return z*/
-  int x_mask = (~(!(!x))) + 1;
+  int x_mask = ((!(!x))<<31)>>31;
   return (x_mask&y)|((~x_mask)&z);
 }
 /* 
