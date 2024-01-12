@@ -1,7 +1,8 @@
 /* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * name: Chenrui Wang
+ * ID: 2021111664
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -143,7 +144,8 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+  /* symmetric differnce, use the De Morgan's laws*/
+  return (~((~x)&(~y))) & (~(x&y));
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -152,9 +154,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+  return (1 << 31);
 }
 //2
 /*
@@ -165,7 +165,8 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+  /* 1+x+x is right, but x+x+1 is wrong */
+  return (!(~(1+x+x)))&(!(!(~x)));
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -176,7 +177,15 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  /* use mask 1010....1010 to check */
+  int odd_bits_mask, x_masked;
+  odd_bits_mask = 0xAA;
+  odd_bits_mask = odd_bits_mask | (odd_bits_mask << 4);
+  odd_bits_mask = odd_bits_mask | (odd_bits_mask << 8);
+  odd_bits_mask = odd_bits_mask | (odd_bits_mask << 16);
+  x_masked = odd_bits_mask & x;
+  x_masked = x_masked | (x_masked >> 1);
+  return !(~x_masked);
 }
 /* 
  * negate - return -x 
@@ -186,7 +195,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return (~x) + 1;
 }
 //3
 /* 
@@ -199,7 +208,13 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int zero_to_seven_mask = 0x6;
+  int zero_to_seven_offset = 3;
+  int eight_to_nine_mask = 0x1C;
+  int eight_to_nine_offset = 1;
+  int x_in_zero_to_seven = !((x>>zero_to_seven_offset)^zero_to_seven_mask);
+  int x_in_eight_to_nine = !((x>>eight_to_nine_offset)^eight_to_nine_mask);
+  return x_in_zero_to_seven|x_in_eight_to_nine;
 }
 /* 
  * conditional - same as x ? y : z 
@@ -209,7 +224,9 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  /* if x is true, return y, else return z*/
+  int x_mask = (~(!(!x))) + 1;
+  return (x_mask&y)|((~x_mask)&z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -219,7 +236,36 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int diff = x^y;
+  int first_one_position = 0;
+  int current_shift;
+  int sign_comp, diff_comp;
+  sign_comp = (diff>>31) & 1;
+
+  current_shift = 16 & ((!(!(diff>>16))) << 4);
+  first_one_position = first_one_position + current_shift;
+  diff = diff >> current_shift;
+
+  current_shift = 8 & ((!(!(diff>>8))) << 3);
+  first_one_position = first_one_position + current_shift;
+  diff = diff >> current_shift;
+
+  current_shift = 4 & ((!(!(diff>>4))) << 2);
+  first_one_position = first_one_position + current_shift;
+  diff = diff >> current_shift;
+
+  current_shift = 2 & ((!(!(diff>>2))) << 1);
+  first_one_position = first_one_position + current_shift;
+  diff = diff >> current_shift;
+
+  current_shift = !(!(diff>>1));
+  first_one_position = first_one_position + current_shift;
+  diff = diff >> current_shift;
+
+  diff = diff & 1; // The first different position. diff is 0 if x=y.
+  y = (y >> first_one_position) & 1;
+  diff_comp = (!diff)|(diff&y);
+  return (sign_comp & (!diff_comp)) | ((!sign_comp) & diff_comp);
 }
 //4
 /* 
