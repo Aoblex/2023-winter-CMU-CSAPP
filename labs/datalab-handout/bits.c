@@ -409,7 +409,26 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+/*
+ * Single precision: 
+ * |    part    |  s  |  exp  |  frac  |
+ * | size(bits) |  1  |   8   |   23   |
+ */
+  unsigned s_mask = 1u<<31, exp_mask = 0xFFu<<23;
+  unsigned s_uf = s_mask & uf;
+  unsigned exp_uf = exp_mask & uf;
+  unsigned exp_uf_scaled = ((exp_uf >> 23) + 1) << 23;
+  unsigned frac_uf = (uf^s_uf)^exp_uf;
+
+  if(exp_uf == exp_mask){ // NaN
+    return uf;
+  }
+
+  if(exp_uf == 0){ // Denormalized
+    return s_uf + (uf << 1);
+  }
+
+  return s_uf + exp_uf_scaled + frac_uf;
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -424,7 +443,35 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  unsigned s_mask = 1u<<31, exp_mask = 0xFFu<<23;
+  unsigned s_uf = s_mask & uf;
+  unsigned exp_uf = exp_mask & uf;
+  unsigned frac_uf = (uf^s_uf)^exp_uf;
+  unsigned infty = 0x80000000u;
+  unsigned Bias = (1<<7) - 1;
+  unsigned e = (exp_uf>>23) - Bias;
+  unsigned float_Tmin = s_mask + (0x1Fu<<23);
+  unsigned int_Tmin = (1<<31);
+  unsigned uf_right_shift = 23 - e;
+  unsigned positive_result;
+  
+  // Tmin
+  if(uf == float_Tmin) return int_Tmin;
+
+  if(e & int_Tmin) return 0; // e is negative
+  if(e >= 31) return infty;
+
+  // Normalized
+  if(uf_right_shift & int_Tmin) // shift is negative
+    positive_result = (1<<e) + (frac_uf<<(-uf_right_shift));    
+  else
+    positive_result = (1<<e) + (frac_uf>>uf_right_shift);
+
+  if(s_uf == 0)
+    return positive_result;
+  else
+    return (~positive_result) + 1;
+
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -440,5 +487,10 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  unsigned pos_inf = (0xFFu) << 23;
+  unsigned Bias = (1<<7) - 1;
+  unsigned E = x + Bias;
+  if(x < -126) return 0;
+  if(x > 128) return pos_inf;
+  return E << 23;
 }
