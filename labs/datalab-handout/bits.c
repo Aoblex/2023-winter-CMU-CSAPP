@@ -176,6 +176,8 @@ int isTmax(int x) {
  * Solution 1:
  *   x = 011...11, then (~x) = 100...00
  *   Check whether (~x) is equal to (1 << 31) to determine the result.
+ * 
+ *   Remark: Invalid operator '<<'.
  *   
  * Solution 2:
  *   x = 011...11, then (2*x + 1) = '111...111'
@@ -185,8 +187,8 @@ int isTmax(int x) {
  *   Remark: '1+x+x' is right, but 'x+x+1' is wrong, why? Is there some kind of coercion?
  */
 
-  return !((~x)^(1<<31)); // Solution 1
-  //return (!(~(1+x+x)))&(!(!(~x))); // Solution 2
+  //return !((~x)^(1<<31)); // Solution 1
+  return (!(~(1+x+x)))&(!(!(~x))); // Solution 2
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -345,9 +347,54 @@ int howManyBits(int x) {
  *     ...
  *   - k = i: [-2^(i-1), 2^(i-1) - 1]
  * For any given x, want to find the minimum k in whose range x falls.
- * Again, we can binarily.
+ * Find the length of leading ones or leading zeros.
  */
-  return 0;
+  int leading_ones_count = 0, leading_zeros_count = 0, leading_count = 0;
+  int current_leading_ones_count, current_leading_zeros_count;
+  int inv_x = ~x; 
+
+  current_leading_ones_count = (!(inv_x>>16))<<4;
+  current_leading_zeros_count = (!(x>>16))<<4;
+  leading_ones_count = leading_ones_count + current_leading_ones_count;
+  leading_zeros_count = leading_zeros_count + current_leading_zeros_count;
+  inv_x = inv_x >> (16^current_leading_ones_count);
+  x = x>>(16^current_leading_zeros_count);
+
+  current_leading_ones_count = (!(inv_x>>8))<<3;
+  current_leading_zeros_count = (!(x>>8))<<3;
+  leading_ones_count = leading_ones_count + current_leading_ones_count;
+  leading_zeros_count = leading_zeros_count + current_leading_zeros_count;
+  inv_x = inv_x >> (8^current_leading_ones_count);
+  x = x>>(8^current_leading_zeros_count);
+
+  current_leading_ones_count = (!(inv_x>>4))<<2;
+  current_leading_zeros_count = (!(x>>4))<<2;
+  leading_ones_count = leading_ones_count + current_leading_ones_count;
+  leading_zeros_count = leading_zeros_count + current_leading_zeros_count;
+  inv_x = inv_x >> (4^current_leading_ones_count);
+  x = x>>(4^current_leading_zeros_count);
+
+  current_leading_ones_count = (!(inv_x>>2))<<1;
+  current_leading_zeros_count = (!(x>>2))<<1;
+  leading_ones_count = leading_ones_count + current_leading_ones_count;
+  leading_zeros_count = leading_zeros_count + current_leading_zeros_count;
+  inv_x = inv_x >> (2^current_leading_ones_count);
+  x = x>>(2^current_leading_zeros_count);
+
+  current_leading_ones_count = !(inv_x>>1);
+  current_leading_zeros_count = !(x>>1);
+  leading_ones_count = leading_ones_count + current_leading_ones_count;
+  leading_zeros_count = leading_zeros_count + current_leading_zeros_count;
+  inv_x = inv_x >> (1^current_leading_ones_count);
+  x = x>>(1^current_leading_zeros_count);
+
+  leading_ones_count = leading_ones_count + (!inv_x);
+  leading_zeros_count = leading_zeros_count + (!x);
+
+  leading_count = leading_ones_count + leading_zeros_count;
+
+  //return 33 - leading_count;
+  return 33 + (~leading_count) + 1;
 }
 //float
 /* 
