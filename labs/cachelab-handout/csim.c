@@ -1,4 +1,8 @@
 #include "cachelab.h"
+#include <getopt.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 /*
 ############  csim usage ##############
