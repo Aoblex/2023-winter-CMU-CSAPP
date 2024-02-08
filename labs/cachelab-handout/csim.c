@@ -68,6 +68,32 @@ void print_set(CacheBlock *set_header, int num_blocks)
     }
 }
 
+void execute_command(CacheBlock **set_headers, const Trace *trace_entry)
+{
+    char operation = trace_entry->operation[0];
+    if (operation == 'I')
+    {
+        printf("Current operation is 'I'.\n");
+    }
+    else if (operation == 'L')
+    {
+        printf("Current operation is 'L'.\n");
+    }
+    else if (operation == 'S')
+    {
+        printf("Current operation is 'S'.\n");
+    }
+    else if (operation == 'M')
+    {
+        printf("Current operation is 'M'.\n");
+    }
+    else
+    {
+        printf("Invalid operation: '%c'.\n", operation);
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int ch = EOF;
@@ -168,7 +194,7 @@ int main(int argc, char *argv[])
     else
     {
         printf("File found: %s\n", trace_file_path);
-        while (~(fscanf(trace_file, "%s %llu,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
+        while (~(fscanf(trace_file, "%s %llx,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
         {
             current_address = trace_entries[entries_count].address;
             trace_entries[entries_count].index.tag_index = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
@@ -180,6 +206,11 @@ int main(int argc, char *argv[])
             }
             ++entries_count;
         }
+    }
+
+    for (int i = 0; i < entries_count; ++i)
+    {
+        execute_command(set_headers, trace_entries + i);
     }
 
     printSummary(hit_count, miss_count, eviction_count);
