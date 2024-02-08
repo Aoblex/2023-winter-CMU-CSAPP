@@ -22,15 +22,28 @@ Examples:
   linux>  ./csim-ref -v -s 8 -E 2 -b 4 -t traces/yi.trace
 */
 
+const int maxn = (1 << 16);
+typedef struct
+{
+    size_t address;
+    short size;
+    char instruction_bit;
+    char data_bit;
+} Trace;
+
 int main(int argc, char *argv[])
 {
-    int ch;
-    int set_index_bits, lines_per_set, block_offset_bits;
+    int i = 0;
+    int ch = EOF;
+    int entries_count = 0;
+    int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
     bool help_flag = false;
     bool verbose_flag = false;
     bool invalid_flag = false;
-    FILE *trace_file;
+    FILE *trace_file = NULL;
+    char line[16];
     const char *optstring = "hvs:E:b:t:";
+    Trace trace_entries[maxn];
 
     while (~(ch = getopt(argc, argv, optstring)))
     {
@@ -93,6 +106,19 @@ int main(int argc, char *argv[])
     {
         printf("File does not exist\n");
         exit(EXIT_FAILURE);
+    }
+    else
+    {
+        printf("File found\n");
+        while (~(fscanf(trace_file, "%c%c %zu,%hd \n", &trace_entries[entries_count].instruction_bit, &trace_entries[entries_count].data_bit, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
+        {
+            printf("ins=%c, data=%c, address=%zu, size=%hd\n", trace_entries[entries_count].instruction_bit, trace_entries[entries_count].data_bit, trace_entries[entries_count].address, trace_entries[entries_count].size);
+            ++entries_count;
+        }
+        for (i = 0; i < entries_count; ++i)
+        {
+            // printf("ins=%c, data=%c, address=%zu, size=%hd\n", trace_entries[i].instruction_bit, trace_entries[i].data_bit, trace_entries[i].address, trace_entries[i].size);
+        }
     }
 
     printSummary(0, 0, 0);
