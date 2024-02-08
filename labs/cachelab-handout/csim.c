@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <limits.h>
 
 /*
 ############  csim usage ##############
@@ -23,25 +24,63 @@ Examples:
 */
 
 const int maxn = (1 << 16);
+
 typedef struct
 {
+    int tag_bits;
+    int set_index_bits;
+    int block_offset_bits;
+} Address;
+
+typedef struct
+{
+    Address index;
     unsigned long long address;
     short size;
     char operation[3];
 } Trace;
+
+typedef struct
+{
+    unsigned long long tag_bits;
+    bool v;
+} CacheBlock;
+
+void print_block(CacheBlock block)
+{
+    printf("valid: %d\n", block.v);
+    printf("tag: %llu\n", block.tag_bits);
+}
+
+void print_set(CacheBlock *set_header, int num_blocks)
+{
+    int i = 0;
+    printf("-------------------\n");
+    for (i = 0; i < num_blocks; ++i)
+    {
+        printf("%dth block:\n", i);
+        print_block(set_header[i]);
+        printf("-------------------\n");
+    }
+}
 
 int main(int argc, char *argv[])
 {
     int i = 0;
     int ch = EOF;
     int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
+    unsigned int num_sets = 0;
+    unsigned long long tag_mask, set_mask, block_mask;
     bool help_flag = false;
     bool verbose_flag = false;
     bool invalid_flag = false;
     char *trace_file_path;
     FILE *trace_file = NULL;
     Trace trace_entries[maxn];
+    unsigned long long current_address = 0;
     int entries_count = 0;
+    CacheBlock **set_headers;
+    CacheBlock *set_header;
     const char *optstring = "hvs:E:b:t:";
 
     while (~(ch = getopt(argc, argv, optstring)))
@@ -100,6 +139,22 @@ int main(int argc, char *argv[])
         printf("Number error\n");
         exit(EXIT_FAILURE);
     }
+    else
+    {
+        // generate masks
+        block_mask = (1ull << block_offset_bits) - 1;
+        set_mask = ((1ull << set_index_bits) - 1) << block_offset_bits;
+        tag_mask = (ULLONG_MAX ^ set_mask) ^ block_mask;
+        num_sets = 1u << set_index_bits;
+
+        // allocate spaces
+        set_headers = (CacheBlock **)malloc(num_sets * sizeof(CacheBlock *));
+        for (i = 0; i < num_sets; ++i)
+        {
+            set_headers[i] = (CacheBlock *)malloc(lines_per_set * sizeof(CacheBlock));
+        }
+        print_set(set_headers[0], lines_per_set);
+    }
 
     // file must exist
     if (trace_file == NULL)
@@ -112,11 +167,11 @@ int main(int argc, char *argv[])
         printf("File found: %s\n", trace_file_path);
         while (~(fscanf(trace_file, "%s %llx,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
         {
+            current_address = trace_entries[entries_count].address;
+            trace_entries[entries_count].index.tag_bits = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
+            trace_entries[entries_count].index.set_index_bits = (set_mask & current_address) >> block_offset_bits;
+            trace_entries[entries_count].index.block_offset_bits = block_mask & current_address;
             ++entries_count;
-        }
-        for (i = 0; i < entries_count; ++i)
-        {
-            printf("operation=%s, address=%llx, size=%hd\n", trace_entries[i].operation, trace_entries[i].address, trace_entries[i].size);
         }
     }
 
