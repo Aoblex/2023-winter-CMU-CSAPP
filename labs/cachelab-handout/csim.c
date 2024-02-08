@@ -46,6 +46,13 @@ typedef struct
     bool v;
 } CacheBlock;
 
+typedef struct
+{
+    int hits_count;
+    int misses_count;
+    int evictions_count;
+} Counter;
+
 void print_block(CacheBlock block)
 {
     printf("valid: %d\n", block.v);
@@ -82,6 +89,7 @@ int main(int argc, char *argv[])
     CacheBlock **set_headers;
     CacheBlock *set_header;
     const char *optstring = "hvs:E:b:t:";
+    Counter result;
 
     while (~(ch = getopt(argc, argv, optstring)))
     {
@@ -175,6 +183,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    printSummary(0, 0, 0);
+    printSummary(result.hits_count, result.misses_count, result.evictions_count);
     return 0;
 }
