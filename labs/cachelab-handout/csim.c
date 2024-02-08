@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     bool help_flag = false;
     bool verbose_flag = false;
     bool invalid_flag = false;
-    char *trace_file;
+    FILE *trace_file;
     const char *optstring = "hvs:E:b:t:";
 
     while (~(ch = getopt(argc, argv, optstring)))
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
             // printf("b = %d\n", block_offset_bits);
             break;
         case 't':
-            trace_file = optarg;
+            trace_file = fopen(optarg, "r");
             // printf("t = %s\n", trace_file);
             break;
         default:
@@ -85,6 +85,13 @@ int main(int argc, char *argv[])
     if ((set_index_bits <= 0) || (lines_per_set <= 0) || (block_offset_bits <= 0))
     {
         printf("Number error\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // file must exist
+    if (trace_file == NULL)
+    {
+        printf("File does not exist\n");
         exit(EXIT_FAILURE);
     }
 
