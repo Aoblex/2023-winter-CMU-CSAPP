@@ -23,11 +23,6 @@ Examples:
   linux>  ./csim-ref -v -s 8 -E 2 -b 4 -t traces/yi.trace
 */
 
-const int maxn = (1 << 16);
-int hit_count = 0;
-int miss_count = 0;
-int eviction_count = 0;
-
 typedef struct
 {
     unsigned long long tag_index;
@@ -47,48 +42,63 @@ typedef struct
 typedef struct
 {
     unsigned long long tag_bits;
+    int use_count;
     bool v;
 } CacheBlock;
 
-void print_block(CacheBlock block)
+// max number of trace entries
+#define ENTRIES 65536
+
+// Count results
+int hit_count = 0, miss_count = 0, eviction_count = 0;
+
+// Cache architecture
+int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
+unsigned long long tag_mask, set_mask, block_mask;
+unsigned int num_sets = 0;
+CacheBlock **set_headers;
+
+// optional flags
+bool help_flag = false;
+bool verbose_flag = false;
+bool invalid_flag = false;
+const char *optstring = "hvs:E:b:t:";
+
+// file parameters
+char *trace_file_path;
+FILE *trace_file = NULL;
+Trace trace_entries[ENTRIES];
+int entries_count = 0;
+
+void execute_data_load(const Trace *trace_entry)
 {
-    printf("valid: %d\n", block.v);
-    printf("tag: %llu\n", block.tag_bits);
+    unsigned long long set_index = trace_entry->index.set_index;
+    CacheBlock *set_header = set_headers[set_index];
+    printf("Current data load operation set index: %llx\n", set_index);
 }
 
-void print_set(CacheBlock *set_header, int num_blocks)
+void execute_data_store(const Trace *trace_entry)
 {
-    int i = 0;
-    printf("-------------------\n");
-    for (i = 0; i < num_blocks; ++i)
-    {
-        printf("%dth block:\n", i);
-        print_block(set_header[i]);
-        printf("-------------------\n");
-    }
 }
 
-void execute_command(CacheBlock **set_headers, const Trace *trace_entry)
+void execute_command(const Trace *trace_entry)
 {
     char operation = trace_entry->operation[0];
-    if (operation == 'I')
+    switch (operation)
     {
-        printf("Current operation is 'I'.\n");
-    }
-    else if (operation == 'L')
-    {
-        printf("Current operation is 'L'.\n");
-    }
-    else if (operation == 'S')
-    {
-        printf("Current operation is 'S'.\n");
-    }
-    else if (operation == 'M')
-    {
-        printf("Current operation is 'M'.\n");
-    }
-    else
-    {
+    case 'L':
+        execute_data_load(trace_entry);
+        break;
+    case 'S':
+        execute_data_store(trace_entry);
+        break;
+    case 'M':
+        execute_data_load(trace_entry);
+        execute_data_store(trace_entry);
+        break;
+    case 'I':
+        break; // do nothing.
+    default:
         printf("Invalid operation: '%c'.\n", operation);
         exit(EXIT_FAILURE);
     }
@@ -97,21 +107,6 @@ void execute_command(CacheBlock **set_headers, const Trace *trace_entry)
 int main(int argc, char *argv[])
 {
     int ch = EOF;
-    int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
-    unsigned int num_sets = 0;
-    unsigned long long tag_mask, set_mask, block_mask;
-    bool help_flag = false;
-    bool verbose_flag = false;
-    bool invalid_flag = false;
-    char *trace_file_path;
-    FILE *trace_file = NULL;
-    Trace trace_entries[maxn];
-    unsigned long long current_address = 0;
-    int entries_count = 0;
-    CacheBlock **set_headers;
-    CacheBlock *set_header;
-    const char *optstring = "hvs:E:b:t:";
-
     while (~(ch = getopt(argc, argv, optstring)))
     {
         switch (ch)
@@ -181,8 +176,13 @@ int main(int argc, char *argv[])
         for (int i = 0; i < num_sets; ++i)
         {
             set_headers[i] = (CacheBlock *)malloc(lines_per_set * sizeof(CacheBlock));
+            for (int j = 0; j < lines_per_set; ++j)
+            {
+                // initialize valid flag
+                set_headers[i][j].v = false;
+                set_headers[i][j].use_count = 0;
+            }
         }
-        print_set(set_headers[0], lines_per_set);
     }
 
     // file must exist
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
         printf("File found: %s\n", trace_file_path);
         while (~(fscanf(trace_file, "%s %llx,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
         {
-            current_address = trace_entries[entries_count].address;
+            unsigned long long current_address = trace_entries[entries_count].address;
             trace_entries[entries_count].index.tag_index = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
             trace_entries[entries_count].index.set_index = (set_mask & current_address) >> block_offset_bits;
             trace_entries[entries_count].index.block_index = block_mask & current_address;
@@ -206,11 +206,12 @@ int main(int argc, char *argv[])
             }
             ++entries_count;
         }
+        fclose(trace_file);
     }
 
     for (int i = 0; i < entries_count; ++i)
     {
-        execute_command(set_headers, trace_entries + i);
+        execute_command(trace_entries + i);
     }
 
     printSummary(hit_count, miss_count, eviction_count);
