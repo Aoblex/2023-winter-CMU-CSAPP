@@ -24,12 +24,15 @@ Examples:
 */
 
 const int maxn = (1 << 16);
+int hit_count = 0;
+int miss_count = 0;
+int eviction_count = 0;
 
 typedef struct
 {
-    int tag_bits;
-    int set_index_bits;
-    int block_offset_bits;
+    unsigned long long tag_index;
+    unsigned long long set_index;
+    unsigned long long block_index;
 } Address;
 
 typedef struct
@@ -37,7 +40,8 @@ typedef struct
     Address index;
     unsigned long long address;
     short size;
-    char operation[3];
+    char operation_results[4];
+    char operation[2];
 } Trace;
 
 typedef struct
@@ -45,13 +49,6 @@ typedef struct
     unsigned long long tag_bits;
     bool v;
 } CacheBlock;
-
-typedef struct
-{
-    int hits_count;
-    int misses_count;
-    int evictions_count;
-} Counter;
 
 void print_block(CacheBlock block)
 {
@@ -73,7 +70,6 @@ void print_set(CacheBlock *set_header, int num_blocks)
 
 int main(int argc, char *argv[])
 {
-    int i = 0;
     int ch = EOF;
     int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
     unsigned int num_sets = 0;
@@ -89,7 +85,6 @@ int main(int argc, char *argv[])
     CacheBlock **set_headers;
     CacheBlock *set_header;
     const char *optstring = "hvs:E:b:t:";
-    Counter result;
 
     while (~(ch = getopt(argc, argv, optstring)))
     {
@@ -157,7 +152,7 @@ int main(int argc, char *argv[])
 
         // allocate spaces
         set_headers = (CacheBlock **)malloc(num_sets * sizeof(CacheBlock *));
-        for (i = 0; i < num_sets; ++i)
+        for (int i = 0; i < num_sets; ++i)
         {
             set_headers[i] = (CacheBlock *)malloc(lines_per_set * sizeof(CacheBlock));
         }
@@ -173,16 +168,20 @@ int main(int argc, char *argv[])
     else
     {
         printf("File found: %s\n", trace_file_path);
-        while (~(fscanf(trace_file, "%s %llx,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
+        while (~(fscanf(trace_file, "%s %llu,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
         {
             current_address = trace_entries[entries_count].address;
-            trace_entries[entries_count].index.tag_bits = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
-            trace_entries[entries_count].index.set_index_bits = (set_mask & current_address) >> block_offset_bits;
-            trace_entries[entries_count].index.block_offset_bits = block_mask & current_address;
+            trace_entries[entries_count].index.tag_index = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
+            trace_entries[entries_count].index.set_index = (set_mask & current_address) >> block_offset_bits;
+            trace_entries[entries_count].index.block_index = block_mask & current_address;
+            for (int i = 0; i < 4; ++i)
+            {
+                trace_entries[entries_count].operation_results[i] = '\0';
+            }
             ++entries_count;
         }
     }
 
-    printSummary(result.hits_count, result.misses_count, result.evictions_count);
+    printSummary(hit_count, miss_count, eviction_count);
     return 0;
 }
