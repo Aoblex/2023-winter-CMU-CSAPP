@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     }
 
     // numbers must be greater than zero
-    if ((set_index_bits < 0) || (lines_per_set < 0) || (block_offset_bits < 0))
+    if ((set_index_bits <= 0) || (lines_per_set <= 0) || (block_offset_bits <= 0))
     {
         printf("Number error\n");
         exit(EXIT_FAILURE);
