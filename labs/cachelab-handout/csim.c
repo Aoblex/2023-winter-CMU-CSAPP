@@ -35,6 +35,7 @@ typedef struct
     Address index;
     unsigned long long address;
     short size;
+    short result_count;
     char operation_results[4];
     char operation[2];
 } Trace;
@@ -75,17 +76,54 @@ FILE *trace_file = NULL;
 Trace trace_entries[ENTRIES];
 int entries_count = 0;
 
-void execute_data_load(CacheSetHeader *cache_set_headers, const Trace *trace_entry)
+void record_result(Trace *trace_entry, char result_type)
+{
+    trace_entry->operation_results[trace_entry->result_count] = result_type;
+    trace_entry->result_count += 1;
+    switch (result_type)
+    {
+    case 'h':
+        hit_count += 1;
+        break;
+    case 'e':
+        eviction_count += 1;
+        break;
+    case 'm':
+        miss_count += 1;
+        break;
+    default:
+        printf("Invalid result type: %c\n", result_type);
+        exit(EXIT_FAILURE);
+        break;
+    }
+}
+
+void execute_data_load(CacheSetHeader *cache_set_headers, Trace *trace_entry)
 {
     unsigned long long set_index = trace_entry->index.set_index;
     unsigned long long tag_index = trace_entry->index.tag_index;
+    CacheSetHeader cache_set_header = cache_set_headers[set_index];
+    CacheLine *current_line_ptr = cache_set_header.head;
+    while (current_line_ptr != NULL)
+    {
+        if (current_line_ptr->tag_index == tag_index)
+        {
+            record_result(trace_entry, 'h');
+            return;
+        }
+        current_line_ptr = current_line_ptr->next;
+    }
+
+    // no hit, then record a miss
+    record_result(trace_entry, 'm');
 }
 
-void execute_data_store(CacheSetHeader *cache_set_headers, const Trace *trace_entry)
+void execute_data_store(CacheSetHeader *cache_set_headers, Trace *trace_entry)
 {
+    return;
 }
 
-void execute_command(CacheSetHeader *cache_set_headers, const Trace *trace_entry)
+void execute_command(CacheSetHeader *cache_set_headers, Trace *trace_entry)
 {
     char operation = trace_entry->operation[0];
     switch (operation)
@@ -197,6 +235,7 @@ int main(int argc, char *argv[])
             trace_entries[entries_count].index.tag_index = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
             trace_entries[entries_count].index.set_index = (set_mask & current_address) >> block_offset_bits;
             trace_entries[entries_count].index.block_index = block_mask & current_address;
+            trace_entries[entries_count].result_count = 0;
             for (int i = 0; i < 4; ++i)
             {
                 trace_entries[entries_count].operation_results[i] = '\0';
