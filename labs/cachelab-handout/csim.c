@@ -44,6 +44,7 @@ typedef struct
 {
     unsigned long long tag_index;
     CacheLine *next;
+    CacheLine *prev;
 } CacheLine;
 
 typedef struct
@@ -75,6 +76,44 @@ char *trace_file_path;
 FILE *trace_file = NULL;
 Trace trace_entries[ENTRIES];
 int entries_count = 0;
+
+CacheLine *create_new_line(unsigned long long tag_index)
+{
+    CacheLine *new_line = (CacheLine *)malloc(sizeof(CacheLine));
+    if (new_line == NULL)
+    {
+        printf("Out of memory");
+        exit(EXIT_FAILURE);
+    }
+    new_line->prev = NULL;
+    new_line->next = NULL;
+    new_line->tag_index = tag_index;
+    return new_line;
+}
+
+CacheLine *delete_line_by_tag_index(CacheLine *line_head, unsigned long long tag_index)
+{
+    while ((line_head != NULL) && (line_head->tag_index != tag_index))
+    {
+        line_head = line_head->next;
+    }
+
+    if (line_head == NULL)
+    {
+        printf("No such tag index: %llu\n", tag_index);
+        exit(EXIT_FAILURE);
+    }
+
+    return line_head;
+}
+
+CacheLine *pop_line(CacheLine *line_head)
+{
+}
+
+CacheLine *prepend_line(CacheLine *line_head, CacheLine new_line)
+{
+}
 
 void execute_data_load(CacheSetHeader *cache_set_headers, Trace *trace_entry)
 {
