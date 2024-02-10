@@ -41,10 +41,15 @@ typedef struct
 
 typedef struct
 {
-    unsigned long long tag_bits;
-    int use_count;
-    bool v;
-} CacheBlock;
+    unsigned long long tag_index;
+    CacheLine *next;
+} CacheLine;
+
+typedef struct
+{
+    CacheLine *head;
+    int length;
+} CacheSetHeader;
 
 // max number of trace entries
 #define ENTRIES 65536
@@ -56,7 +61,7 @@ int hit_count = 0, miss_count = 0, eviction_count = 0;
 int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
 unsigned long long tag_mask, set_mask, block_mask;
 unsigned int num_sets = 0;
-CacheBlock **set_headers;
+CacheSetHeader *cache_set_headers;
 
 // optional flags
 bool help_flag = false;
@@ -70,31 +75,30 @@ FILE *trace_file = NULL;
 Trace trace_entries[ENTRIES];
 int entries_count = 0;
 
-void execute_data_load(const Trace *trace_entry)
+void execute_data_load(CacheSetHeader *cache_set_headers, const Trace *trace_entry)
 {
     unsigned long long set_index = trace_entry->index.set_index;
-    CacheBlock *set_header = set_headers[set_index];
-    printf("Current data load operation set index: %llx\n", set_index);
+    unsigned long long tag_index = trace_entry->index.tag_index;
 }
 
-void execute_data_store(const Trace *trace_entry)
+void execute_data_store(CacheSetHeader *cache_set_headers, const Trace *trace_entry)
 {
 }
 
-void execute_command(const Trace *trace_entry)
+void execute_command(CacheSetHeader *cache_set_headers, const Trace *trace_entry)
 {
     char operation = trace_entry->operation[0];
     switch (operation)
     {
     case 'L':
-        execute_data_load(trace_entry);
+        execute_data_load(cache_set_headers, trace_entry);
         break;
     case 'S':
-        execute_data_store(trace_entry);
+        execute_data_store(cache_set_headers, trace_entry);
         break;
     case 'M':
-        execute_data_load(trace_entry);
-        execute_data_store(trace_entry);
+        execute_data_load(cache_set_headers, trace_entry);
+        execute_data_store(cache_set_headers, trace_entry);
         break;
     case 'I':
         break; // do nothing.
@@ -113,32 +117,25 @@ int main(int argc, char *argv[])
         {
         case 'h':
             help_flag = true;
-            // printf("get help!\n");
             break;
         case 'v':
             verbose_flag = true;
-            // printf("verbose! \n");
             break;
         case 's':
             set_index_bits = atoi(optarg);
-            // printf("s = %d\n", set_index_bits);
             break;
         case 'E':
             lines_per_set = atoi(optarg);
-            // printf("E = %d\n", lines_per_set);
             break;
         case 'b':
             block_offset_bits = atoi(optarg);
-            // printf("b = %d\n", block_offset_bits);
             break;
         case 't':
             trace_file_path = optarg;
             trace_file = fopen(trace_file_path, "r");
-            // printf("t = %s\n", trace_file);
             break;
         default:
             invalid_flag = true;
-            // printf("error\n");
             break;
         }
     }
@@ -171,17 +168,17 @@ int main(int argc, char *argv[])
         tag_mask = (ULLONG_MAX ^ set_mask) ^ block_mask;
         num_sets = 1u << set_index_bits;
 
-        // allocate spaces
-        set_headers = (CacheBlock **)malloc(num_sets * sizeof(CacheBlock *));
+        // allocate spaces for cache
+        cache_set_headers = (CacheSetHeader *)malloc(num_sets * sizeof(CacheSetHeader));
+        if (cache_set_headers == NULL)
+        {
+            printf("Out of memory\n");
+            exit(EXIT_FAILURE);
+        }
         for (int i = 0; i < num_sets; ++i)
         {
-            set_headers[i] = (CacheBlock *)malloc(lines_per_set * sizeof(CacheBlock));
-            for (int j = 0; j < lines_per_set; ++j)
-            {
-                // initialize valid flag
-                set_headers[i][j].v = false;
-                set_headers[i][j].use_count = 0;
-            }
+            cache_set_headers[i].head = NULL;
+            cache_set_headers[i].length = 0;
         }
     }
 
@@ -211,7 +208,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < entries_count; ++i)
     {
-        execute_command(trace_entries + i);
+        execute_command(cache_set_headers, trace_entries + i);
     }
 
     printSummary(hit_count, miss_count, eviction_count);
