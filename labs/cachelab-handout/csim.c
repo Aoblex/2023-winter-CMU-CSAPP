@@ -40,12 +40,13 @@ typedef struct
     char operation[2];
 } Trace;
 
-typedef struct
+struct CacheLine
 {
     unsigned long long tag_index;
-    CacheLine *next;
-    CacheLine *prev;
-} CacheLine;
+    struct CacheLine *next;
+    struct CacheLine *prev;
+};
+typedef struct CacheLine CacheLine;
 
 typedef struct
 {
@@ -91,29 +92,20 @@ CacheLine *create_new_line(unsigned long long tag_index)
     return new_line;
 }
 
-CacheLine *delete_line_by_tag_index(CacheSet *cache_set, unsigned long long tag_index)
+CacheLine *move_to_head(CacheSet *cache_set, CacheLine *line_head)
 {
-    CacheLine *line_head = cache_set->head;
-
-    while ((line_head != NULL) && (line_head->tag_index != tag_index))
-    {
-        line_head = line_head->next;
-    }
-
-    if (line_head == NULL)
-    {
-        printf("No such tag index: %llu\n", tag_index);
-        exit(EXIT_FAILURE);
-    }
-
+    // Move line_head to head
+    CacheLine *cache_set_head = cache_set->head;
     CacheLine *line_prev = line_head->prev;
     CacheLine *line_next = line_head->next;
 
+    cache_set->head = line_head;
+    cache_set_head->prev = line_head;
+    line_head->prev = NULL;
+    line_head->next = cache_set_head;
+
     if (line_prev != NULL)
         line_prev->next = line_next;
-    else
-        cache_set->head = line_next;
-
     if (line_next != NULL)
         line_next->prev = line_prev;
 
@@ -129,6 +121,7 @@ CacheLine *pop_line(CacheSet *cache_set)
         exit(EXIT_FAILURE);
     }
 
+    // Find the last element
     while (line_head->next != NULL)
     {
         line_head = line_head->next;
@@ -142,6 +135,7 @@ CacheLine *pop_line(CacheSet *cache_set)
     {
         cache_set->head = NULL;
     }
+    cache_set->length -= 1;
     return line_head;
 }
 
@@ -150,17 +144,73 @@ CacheLine *prepend_line(CacheSet *cache_set, CacheLine *new_line)
     new_line->prev = NULL;
     new_line->next = cache_set->head;
     cache_set->head = new_line;
+    cache_set->length += 1;
     return new_line;
+}
+
+void record_result(Trace *trace_entry, char result_type)
+{
+    trace_entry->operation_results[trace_entry->result_count] = result_type;
+    trace_entry->result_count += 1;
+    switch (result_type)
+    {
+    case 'h':
+        hit_count += 1;
+        break;
+    case 'e':
+        eviction_count += 1;
+        break;
+    case 'm':
+        miss_count += 1;
+        break;
+    default:
+        printf("Invalid result type: %c\n", result_type);
+        exit(EXIT_FAILURE);
+        break;
+    }
+    return;
 }
 
 void execute_data_load(CacheSet *cache_sets, Trace *trace_entry)
 {
+    unsigned long long set_index = trace_entry->index.set_index;
+    unsigned long long tag_index = trace_entry->index.tag_index;
+    CacheSet cache_set = cache_sets[set_index];
+    CacheLine *line_head = cache_set.head;
+
+    // Try to find by tag_index
+    while ((line_head != NULL) && (line_head->tag_index != tag_index))
+    {
+        line_head = line_head->next;
+    }
+
+    // Found the cached line
+    if (line_head != NULL)
+    {
+        // Record a hit
+        record_result(trace_entry, 'h');
+        move_to_head(&cache_set, line_head);
+    }
+    else
+    {
+        // Record a miss
+        record_result(trace_entry, 'm');
+
+        // Write to cache
+        if (cache_set.length == lines_per_set)
+        {
+            CacheLine *new_line = create_new_line(tag_index);
+            pop_line(&cache_set);
+            prepend_line(&cache_set, new_line);
+            record_result(trace_entry, 'e');
+        }
+    }
     return;
 }
 
 void execute_data_store(CacheSet *cache_sets, Trace *trace_entry)
 {
-    return;
+    execute_data_load(cache_sets, trace_entry);
 }
 
 void execute_command(CacheSet *cache_set_headers, Trace *trace_entry)
@@ -183,28 +233,6 @@ void execute_command(CacheSet *cache_set_headers, Trace *trace_entry)
     default:
         printf("Invalid operation: '%c'.\n", operation);
         exit(EXIT_FAILURE);
-    }
-}
-
-void record_result(Trace *trace_entry, char result_type)
-{
-    trace_entry->operation_results[trace_entry->result_count] = result_type;
-    trace_entry->result_count += 1;
-    switch (result_type)
-    {
-    case 'h':
-        hit_count += 1;
-        break;
-    case 'e':
-        eviction_count += 1;
-        break;
-    case 'm':
-        miss_count += 1;
-        break;
-    default:
-        printf("Invalid result type: %c\n", result_type);
-        exit(EXIT_FAILURE);
-        break;
     }
 }
 
