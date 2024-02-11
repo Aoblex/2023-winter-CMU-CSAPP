@@ -78,14 +78,12 @@ FILE *trace_file = NULL;
 Trace trace_entries[ENTRIES];
 int entries_count = 0;
 
-void show_set(const CacheSet *cache_set)
+void show_cacheset(const CacheSet *cache_set)
 {
     CacheLine *line_head = cache_set->head;
-    printf("------------------------------------------------------\n");
-    printf("Set length = %d\n", cache_set->length);
     while (line_head != NULL)
     {
-        printf("--> %llu ", line_head->tag_index);
+        printf("--> %llx ", line_head->tag_index);
         line_head = line_head->next;
     }
     printf("\n");
@@ -93,9 +91,8 @@ void show_set(const CacheSet *cache_set)
 
 void show_trace(const Trace *trace_entry)
 {
-    printf("%c %llx,%hd",
-           trace_entry->operation[0], trace_entry->address, trace_entry->size);
-
+    // printf("set_index=%llx, tag_index=%llx\n", trace_entry->index.set_index, trace_entry->index.tag_index);
+    printf("%c %llx,%hd", trace_entry->operation[0], trace_entry->address, trace_entry->size);
     int result_count = trace_entry->result_count;
     for (int i = 0; i < result_count; ++i)
     {
@@ -135,12 +132,11 @@ CacheLine *create_new_line(unsigned long long tag_index)
 
 CacheLine *move_to_head(CacheSet *cache_set, CacheLine *line_head)
 {
-    if (cache_set->length == 1)
+    if (cache_set->head == line_head)
     {
         return line_head;
     }
 
-    // Move line_head to head, at least 2 elements
     CacheLine *cache_set_head = cache_set->head;
     CacheLine *line_prev = line_head->prev;
     CacheLine *line_next = line_head->next;
@@ -188,7 +184,19 @@ CacheLine *pop_line(CacheSet *cache_set)
 CacheLine *prepend_line(CacheSet *cache_set, unsigned long long tag_index)
 {
     CacheLine *new_line = create_new_line(tag_index);
-    cache_set->head = new_line;
+    CacheLine *line_head = cache_set->head;
+
+    if (line_head == NULL)
+    {
+        cache_set->head = new_line;
+    }
+    else
+    {
+        line_head->prev = new_line;
+        new_line->next = line_head;
+        cache_set->head = new_line;
+    }
+
     cache_set->length += 1;
     return new_line;
 }
@@ -253,6 +261,7 @@ void execute_data_load(CacheSet *cache_sets, Trace *trace_entry)
             prepend_line(cache_set, tag_index);
         }
     }
+    // show_cacheset(cache_set);
     return;
 }
 
@@ -394,7 +403,7 @@ void load_options()
     }
     else
     {
-        printf("File found: %s\n", trace_file_path);
+        // printf("File found: %s\n", trace_file_path);
         read_traces();
     }
 }
@@ -406,8 +415,11 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < entries_count; ++i)
     {
+        if (trace_entries[i].operation[0] == 'I')
+        {
+            continue;
+        }
         execute_command(cache_sets, trace_entries + i);
-        // show_set(cache_sets + i);
         if (verbose_flag)
         {
             show_trace(trace_entries + i);
