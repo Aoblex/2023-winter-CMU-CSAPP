@@ -54,9 +54,6 @@ typedef struct
     int length;
 } CacheSet;
 
-// Max number of trace entries
-#define ENTRIES 65536
-
 // Count results
 int hit_count = 0, miss_count = 0, eviction_count = 0;
 
@@ -75,7 +72,6 @@ const char *optstring = "hvs:E:b:t:";
 // File parameters
 char *trace_file_path;
 FILE *trace_file = NULL;
-Trace trace_entries[ENTRIES];
 int entries_count = 0;
 
 void show_cacheset(const CacheSet *cache_set)
@@ -270,20 +266,20 @@ void execute_data_store(CacheSet *cache_sets, Trace *trace_entry)
     execute_data_load(cache_sets, trace_entry);
 }
 
-void execute_command(CacheSet *cache_set_headers, Trace *trace_entry)
+void execute_command(CacheSet *cache_sets, Trace *trace_entry)
 {
     char operation = trace_entry->operation[0];
     switch (operation)
     {
     case 'L':
-        execute_data_load(cache_set_headers, trace_entry);
+        execute_data_load(cache_sets, trace_entry);
         break;
     case 'S':
-        execute_data_store(cache_set_headers, trace_entry);
+        execute_data_store(cache_sets, trace_entry);
         break;
     case 'M':
-        execute_data_load(cache_set_headers, trace_entry);
-        execute_data_store(cache_set_headers, trace_entry);
+        execute_data_load(cache_sets, trace_entry);
+        execute_data_store(cache_sets, trace_entry);
         break;
     case 'I':
         break; // Do nothing
@@ -291,24 +287,6 @@ void execute_command(CacheSet *cache_set_headers, Trace *trace_entry)
         printf("Invalid operation: '%c'.\n", operation);
         exit(EXIT_FAILURE);
     }
-}
-
-void read_traces()
-{
-    while (~(fscanf(trace_file, "%s %llx,%hd \n", trace_entries[entries_count].operation, &trace_entries[entries_count].address, &trace_entries[entries_count].size)))
-    {
-        unsigned long long current_address = trace_entries[entries_count].address;
-        trace_entries[entries_count].index.tag_index = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
-        trace_entries[entries_count].index.set_index = (set_mask & current_address) >> block_offset_bits;
-        trace_entries[entries_count].index.block_index = block_mask & current_address;
-        trace_entries[entries_count].result_count = 0;
-        for (int i = 0; i < 4; ++i)
-        {
-            trace_entries[entries_count].operation_results[i] = '\0';
-        }
-        ++entries_count;
-    }
-    fclose(trace_file);
 }
 
 void initialize_cache()
@@ -401,11 +379,6 @@ void load_options()
         printf("File does not exist\n");
         exit(EXIT_FAILURE);
     }
-    else
-    {
-        // printf("File found: %s\n", trace_file_path);
-        read_traces();
-    }
 }
 
 int main(int argc, char *argv[])
@@ -413,18 +386,43 @@ int main(int argc, char *argv[])
     parse_options(argc, argv);
     load_options();
 
-    for (int i = 0; i < entries_count; ++i)
+    Trace *trace_entry = (Trace *)malloc(sizeof(Trace));
+    if (trace_entry == NULL)
     {
-        if (trace_entries[i].operation[0] == 'I')
+        printf("Out of memory\n");
+        exit(EXIT_FAILURE);
+    }
+    while (~(fscanf(trace_file, "%s %llx,%hd \n", trace_entry->operation, &trace_entry->address, &trace_entry->size)))
+    {
+        unsigned long long current_address = trace_entry->address;
+        trace_entry->index.tag_index = (tag_mask & current_address) >> (set_index_bits + block_offset_bits);
+        trace_entry->index.set_index = (set_mask & current_address) >> block_offset_bits;
+        trace_entry->index.block_index = block_mask & current_address;
+        trace_entry->result_count = 0;
+        for (int i = 0; i < 4; ++i)
         {
-            continue;
+            trace_entry->operation_results[i] = '\0';
         }
-        execute_command(cache_sets, trace_entries + i);
+        execute_command(cache_sets, trace_entry);
         if (verbose_flag)
         {
-            show_trace(trace_entries + i);
+            show_trace(trace_entry);
         }
     }
+    fclose(trace_file);
+
+    // for (int i = 0; i < entries_count; ++i)
+    // {
+    //     if (trace_entries[i].operation[0] == 'I')
+    //     {
+    //         continue;
+    //     }
+    //     execute_command(cache_sets, trace_entries + i);
+    //     if (verbose_flag)
+    //     {
+    //         show_trace(trace_entries + i);
+    //     }
+    // }
 
     printSummary(hit_count, miss_count, eviction_count);
     return 0;
