@@ -51,7 +51,7 @@ typedef struct
 {
     CacheLine *head;
     int length;
-} CacheSetHeader;
+} CacheSet;
 
 // Max number of trace entries
 #define ENTRIES 65536
@@ -63,7 +63,7 @@ int hit_count = 0, miss_count = 0, eviction_count = 0;
 int set_index_bits = 0, lines_per_set = 0, block_offset_bits = 0;
 unsigned long long tag_mask, set_mask, block_mask;
 unsigned int num_sets = 0;
-CacheSetHeader *cache_set_headers;
+CacheSet *cache_sets;
 
 // Optional flags
 bool help_flag = false;
@@ -91,8 +91,10 @@ CacheLine *create_new_line(unsigned long long tag_index)
     return new_line;
 }
 
-CacheLine *delete_line_by_tag_index(CacheLine *line_head, unsigned long long tag_index)
+CacheLine *delete_line_by_tag_index(CacheSet *cache_set, unsigned long long tag_index)
 {
+    CacheLine *line_head = cache_set->head;
+
     while ((line_head != NULL) && (line_head->tag_index != tag_index))
     {
         line_head = line_head->next;
@@ -104,30 +106,64 @@ CacheLine *delete_line_by_tag_index(CacheLine *line_head, unsigned long long tag
         exit(EXIT_FAILURE);
     }
 
+    CacheLine *line_prev = line_head->prev;
+    CacheLine *line_next = line_head->next;
+
+    if (line_prev != NULL)
+        line_prev->next = line_next;
+    else
+        cache_set->head = line_next;
+
+    if (line_next != NULL)
+        line_next->prev = line_prev;
+
     return line_head;
 }
 
-CacheLine *pop_line(CacheLine *line_head)
+CacheLine *pop_line(CacheSet *cache_set)
 {
+    CacheLine *line_head = cache_set->head;
+    if (line_head == NULL)
+    {
+        printf("Empty cache!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    while (line_head->next != NULL)
+    {
+        line_head = line_head->next;
+    }
+
+    if (line_head->prev != NULL)
+    {
+        line_head->prev->next = NULL;
+    }
+    else
+    {
+        cache_set->head = NULL;
+    }
+    return line_head;
 }
 
-CacheLine *prepend_line(CacheLine *line_head, CacheLine new_line)
+CacheLine *prepend_line(CacheSet *cache_set, CacheLine *new_line)
 {
+    new_line->prev = NULL;
+    new_line->next = cache_set->head;
+    cache_set->head = new_line;
+    return new_line;
 }
 
-void execute_data_load(CacheSetHeader *cache_set_headers, Trace *trace_entry)
-{
-    unsigned long long set_index = trace_entry->index.set_index;
-    unsigned long long tag_index = trace_entry->index.tag_index;
-    CacheSetHeader cache_set_header = cache_set_headers[set_index];
-}
-
-void execute_data_store(CacheSetHeader *cache_set_headers, Trace *trace_entry)
+void execute_data_load(CacheSet *cache_sets, Trace *trace_entry)
 {
     return;
 }
 
-void execute_command(CacheSetHeader *cache_set_headers, Trace *trace_entry)
+void execute_data_store(CacheSet *cache_sets, Trace *trace_entry)
+{
+    return;
+}
+
+void execute_command(CacheSet *cache_set_headers, Trace *trace_entry)
 {
     char operation = trace_entry->operation[0];
     switch (operation)
@@ -200,8 +236,8 @@ void initialize_cache()
     num_sets = 1u << set_index_bits;
 
     // Allocate spaces for cache
-    cache_set_headers = (CacheSetHeader *)malloc(num_sets * sizeof(CacheSetHeader));
-    if (cache_set_headers == NULL)
+    cache_sets = (CacheSet *)malloc(num_sets * sizeof(CacheSet));
+    if (cache_sets == NULL)
     {
         printf("Out of memory\n");
         exit(EXIT_FAILURE);
@@ -209,8 +245,8 @@ void initialize_cache()
     for (int i = 0; i < num_sets; ++i)
     {
         // Set to default value
-        cache_set_headers[i].head = NULL;
-        cache_set_headers[i].length = 0;
+        cache_sets[i].head = NULL;
+        cache_sets[i].length = 0;
     }
 }
 
@@ -294,7 +330,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < entries_count; ++i)
     {
-        execute_command(cache_set_headers, trace_entries + i);
+        execute_command(cache_sets, trace_entries + i);
     }
 
     printSummary(hit_count, miss_count, eviction_count);
