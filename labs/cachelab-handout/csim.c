@@ -91,12 +91,32 @@ void show_set(const CacheSet *cache_set)
     printf("\n");
 }
 
-void show_command(const Trace *trace_entry)
+void show_trace(const Trace *trace_entry)
 {
-    printf("type:%c, set:%llu, tag:%llu\n",
-           trace_entry->operation[0], trace_entry->index.set_index, trace_entry->index.tag_index);
+    printf("%c %llx,%hd",
+           trace_entry->operation[0], trace_entry->address, trace_entry->size);
 
-    printf("results: %s\n", trace_entry->operation_results);
+    int result_count = trace_entry->result_count;
+    for (int i = 0; i < result_count; ++i)
+    {
+        switch (trace_entry->operation_results[i])
+        {
+        case 'h':
+            printf(" hit");
+            break;
+        case 'e':
+            printf(" eviction");
+            break;
+        case 'm':
+            printf(" miss");
+            break;
+        default:
+            printf("\nUnknown result type: %c\n", trace_entry->operation_results[i]);
+            exit(EXIT_FAILURE);
+            break;
+        }
+    }
+    printf("\n");
 }
 
 CacheLine *create_new_line(unsigned long long tag_index)
@@ -388,7 +408,10 @@ int main(int argc, char *argv[])
     {
         execute_command(cache_sets, trace_entries + i);
         // show_set(cache_sets + i);
-        // show_command(trace_entries + i);
+        if (verbose_flag)
+        {
+            show_trace(trace_entries + i);
+        }
     }
 
     printSummary(hit_count, miss_count, eviction_count);
