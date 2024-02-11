@@ -78,6 +78,27 @@ FILE *trace_file = NULL;
 Trace trace_entries[ENTRIES];
 int entries_count = 0;
 
+void show_set(const CacheSet *cache_set)
+{
+    CacheLine *line_head = cache_set->head;
+    printf("------------------------------------------------------\n");
+    printf("Set length = %d\n", cache_set->length);
+    while (line_head != NULL)
+    {
+        printf("--> %llu ", line_head->tag_index);
+        line_head = line_head->next;
+    }
+    printf("\n");
+}
+
+void show_command(const Trace *trace_entry)
+{
+    printf("type:%c, set:%llu, tag:%llu\n",
+           trace_entry->operation[0], trace_entry->index.set_index, trace_entry->index.tag_index);
+
+    printf("results: %s\n", trace_entry->operation_results);
+}
+
 CacheLine *create_new_line(unsigned long long tag_index)
 {
     CacheLine *new_line = (CacheLine *)malloc(sizeof(CacheLine));
@@ -94,7 +115,12 @@ CacheLine *create_new_line(unsigned long long tag_index)
 
 CacheLine *move_to_head(CacheSet *cache_set, CacheLine *line_head)
 {
-    // Move line_head to head
+    if (cache_set->length == 1)
+    {
+        return line_head;
+    }
+
+    // Move line_head to head, at least 2 elements
     CacheLine *cache_set_head = cache_set->head;
     CacheLine *line_prev = line_head->prev;
     CacheLine *line_next = line_head->next;
@@ -139,10 +165,9 @@ CacheLine *pop_line(CacheSet *cache_set)
     return line_head;
 }
 
-CacheLine *prepend_line(CacheSet *cache_set, CacheLine *new_line)
+CacheLine *prepend_line(CacheSet *cache_set, unsigned long long tag_index)
 {
-    new_line->prev = NULL;
-    new_line->next = cache_set->head;
+    CacheLine *new_line = create_new_line(tag_index);
     cache_set->head = new_line;
     cache_set->length += 1;
     return new_line;
@@ -175,8 +200,8 @@ void execute_data_load(CacheSet *cache_sets, Trace *trace_entry)
 {
     unsigned long long set_index = trace_entry->index.set_index;
     unsigned long long tag_index = trace_entry->index.tag_index;
-    CacheSet cache_set = cache_sets[set_index];
-    CacheLine *line_head = cache_set.head;
+    CacheSet *cache_set = cache_sets + set_index;
+    CacheLine *line_head = cache_set->head;
 
     // Try to find by tag_index
     while ((line_head != NULL) && (line_head->tag_index != tag_index))
@@ -189,7 +214,7 @@ void execute_data_load(CacheSet *cache_sets, Trace *trace_entry)
     {
         // Record a hit
         record_result(trace_entry, 'h');
-        move_to_head(&cache_set, line_head);
+        move_to_head(cache_set, line_head);
     }
     else
     {
@@ -197,12 +222,15 @@ void execute_data_load(CacheSet *cache_sets, Trace *trace_entry)
         record_result(trace_entry, 'm');
 
         // Write to cache
-        if (cache_set.length == lines_per_set)
+        if (cache_set->length == lines_per_set)
         {
-            CacheLine *new_line = create_new_line(tag_index);
-            pop_line(&cache_set);
-            prepend_line(&cache_set, new_line);
+            pop_line(cache_set);
+            prepend_line(cache_set, tag_index);
             record_result(trace_entry, 'e');
+        }
+        else
+        {
+            prepend_line(cache_set, tag_index);
         }
     }
     return;
@@ -359,6 +387,8 @@ int main(int argc, char *argv[])
     for (int i = 0; i < entries_count; ++i)
     {
         execute_command(cache_sets, trace_entries + i);
+        // show_set(cache_sets + i);
+        // show_command(trace_entries + i);
     }
 
     printSummary(hit_count, miss_count, eviction_count);
