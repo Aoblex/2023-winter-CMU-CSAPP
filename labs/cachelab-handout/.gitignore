@@ -2,3 +2,7 @@
 !.gitignore
 *.o
 csim
+tracegen
+trace\.*
+.tmp
+*.tar
